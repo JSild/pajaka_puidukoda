@@ -1,7 +1,6 @@
-import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 const EMAIL_TO = process.env.EMAIL_TO || 'info@pajakapuidukoda.ee';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'Pajaka Puidukoda <onboarding@resend.dev>';
@@ -119,22 +118,31 @@ export async function POST(request) {
   };
 
   try {
-    // Send order notification to the workshop
-    await resend.emails.send({
-      from: EMAIL_FROM,
-      to: [EMAIL_TO],
-      replyTo: safe.email,
-      subject: `Uus pakkumise päring: ${safe.productName}`,
-      html: formatOrderEmail(safe),
-    });
+    if (RESEND_API_KEY) {
+      // Resend on seadistatud — saada päris e-mailid
+      const { Resend } = await import('resend');
+      const resend = new Resend(RESEND_API_KEY);
+      const EMAIL_TO = process.env.EMAIL_TO || 'info@pajakapuidukoda.ee';
+      const EMAIL_FROM = process.env.EMAIL_FROM || 'Pajaka Puidukoda <onboarding@resend.dev>';
 
-    // Send confirmation to the customer
-    await resend.emails.send({
-      from: EMAIL_FROM,
-      to: [safe.email],
-      subject: 'Pajaka Puidukoda — päringu kinnitus',
-      html: formatConfirmationEmail(safe),
-    });
+      await resend.emails.send({
+        from: EMAIL_FROM,
+        to: [EMAIL_TO],
+        replyTo: safe.email,
+        subject: `Uus pakkumise päring: ${safe.productName}`,
+        html: formatOrderEmail(safe),
+      });
+
+      await resend.emails.send({
+        from: EMAIL_FROM,
+        to: [safe.email],
+        subject: 'Pajaka Puidukoda — päringu kinnitus',
+        html: formatConfirmationEmail(safe),
+      });
+    } else {
+      // E-mail pole seadistatud — logi konsooli (arendusrežiim)
+      console.log('📧 [E-mail pole seadistatud] Päring:', safe);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
